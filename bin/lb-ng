@@ -12,6 +12,8 @@ var argv = optimist
     '\n    $0 [options] server/app.js [client/js/lb-services.js]')
   .describe('m', 'The name for generated Angular module.')
   .default('m', 'lbServices')
+  .describe('timeout', 'timeout')
+  .default('timeout', '100')
   .describe('u', 'URL of the REST API end-point')
   .alias({ u : 'url', m: 'module-name' })
   .demand(1)
@@ -33,28 +35,31 @@ if (app.booting) {
 function runGenerator() {
   var ngModuleName = argv['module-name'] || 'lbServices';
   var apiUrl = argv['url'] || app.get('restApiRoot') || '/api';
+  var timeout = Number(argv['timeout'] || '100')
 
-  console.error('Generating %j for the API endpoint %j', ngModuleName, apiUrl);
-  var result = generator.services(app, ngModuleName, apiUrl);
 
-  if (outputFile) {
-    outputFile = path.resolve(outputFile);
-    console.error('Saving the generated services source to %j', outputFile);
-    fs.writeFileSync(outputFile, result);
-  } else {
-    console.error('Dumping to stdout');
-    process.stdout.write(result);
-  }
+  setTimeout(function() {
+    console.error('Generating %j for the API endpoint %j', ngModuleName, apiUrl);
+    var result = generator.services(app, ngModuleName, apiUrl);
+    if (outputFile) {
+      outputFile = path.resolve(outputFile);
+      console.error('Saving the generated services source to %j', outputFile);
+      fs.writeFileSync(outputFile, result);
+    } else {
+      console.error('Dumping to stdout');
+      process.stdout.write(result);
+    }
+    // The app.js scaffolded by `slc lb project` loads strong-agent module that
+    // used to have a bug where it prevented the application from exiting.
+    // To work around that issue, we are explicitly exiting here.
+    //
+    // The exit is deferred to the next tick in order to prevent the Node bug:
+    // https://github.com/joyent/node/issues/3584
+    process.nextTick(function() {
+      process.exit();
+    });
+  }, timeout)
 
-  // The app.js scaffolded by `slc lb project` loads strong-agent module that
-  // used to have a bug where it prevented the application from exiting.
-  // To work around that issue, we are explicitly exiting here.
-  //
-  // The exit is deferred to the next tick in order to prevent the Node bug:
-  // https://github.com/joyent/node/issues/3584
-  process.nextTick(function() {
-    process.exit();
-  });
 }
 
 //--- helpers ---//
